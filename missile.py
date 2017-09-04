@@ -2,7 +2,7 @@ import pygame
 import random
 import math
 
-global alive, black, white, red, populationSize
+global alive, black, white, red, green, blue, populationSize, xPosition, yPosition
 screen_width = 1200
 screen_height = 600
 fps=60
@@ -23,16 +23,22 @@ while mutation < 0 or mutation > 100:
     print("Enter a number between 0 and 100")
     mutation = int(input("Enter the % chance of an element's attribute mutating: "))
 
-maxSpeed = 2000
+maxSpeed = 10000
 
 alive = 0
 generations = 0
 population=[]
-best = [[999,[0,0]], [999,[0,0]]]
+best = [[9999,[0,0]], [9999,[0,0]]]
+
+solved = False
+xPosition = 0
+yPosition = 0
 
 black = (0,0,0)
 white = (255,255,255)
 red = (255,0,0)
+green = (0,255,0)
+blue = (0,0,255)
 
 class Block(pygame.sprite.Sprite):
 
@@ -89,11 +95,30 @@ class Block(pygame.sprite.Sprite):
             score = score * -1
         population.append([score, details])
 
+    def storePosition(self):
+        global xPosition, yPosition
+        xPosition = self.rect.x
+        yPosition = self.rect.y
+
+class Trail(pygame.sprite.Sprite):
+
+    def __init__(self, color, y, x):
+        super().__init__()
+
+        self.image = pygame.Surface([5,5])
+        self.image.fill(color)
+
+        pygame.draw.ellipse(self.image, color, [0,0,5,5])
+        self.rect = self.image.get_rect()
+
+        self.rect.y = y
+        self.rect.x = x
+
 def makeRandomRocket():
-    speed = random.randrange(0, maxSpeed*5)
-    speed = speed/5
-    angle = random.randrange(0, 3600)
-    angle = angle/10
+    speed = random.randrange(0, maxSpeed*100)
+    speed = speed/100
+    angle = random.randrange(0, 36000)
+    angle = angle/100
     rocket = Block(black, 20, 20, speed, angle)
     rocket.rect.x = 0
     rocket.rect.y = screen_height-20
@@ -125,8 +150,8 @@ def newPopulation():
     angleMutate = random.randrange(0,100)
 
     if speedMutate <= mutation:
-        speed = random.randrange(0, maxSpeed * 5)
-        speed = speed/5
+        speed = random.randrange(0, maxSpeed * 100)
+        speed = speed/100
     else:
         speedParent = random.randrange(0,1)
         if speedParent == 0:
@@ -135,8 +160,8 @@ def newPopulation():
             speed = best[1][1][0]
 
     if angleMutate <= mutation:
-        angle = random.randrange(0, 3600)
-        angle = angle/10
+        angle = random.randrange(0, 36000)
+        angle = angle/100
     else:
         angleParent = random.randrange(0,1)
         if angleParent == 0:
@@ -151,13 +176,44 @@ def newPopulation():
     all_sprites_list.add(rocket)
     rockets.add(rocket)
     
+def newPopulationBetter():
+    speedParent = random.randrange(0,1)
+    angleParent = random.randrange(0,1)
 
+    if speedParent == 0:
+        speed = best[0][1][0]
+    else:
+        speed = best[1][1][0]
+
+    if angleParent == 0:
+        angle = best[0][1][1]
+    else:
+        angle = best[1][1][1]
+
+    speedMutate = random.randrange(0,100)
+    angleMutate = random.randrange(0,100)
+
+    if speedMutate <= mutation:
+        speed = speed + (random.randrange(-maxSpeed, maxSpeed))/100
+
+    if angleMutate <= mutation:
+        angle = angle + (random.randrange(-360, 360))/100
+
+    rocket = Block(black, 20, 20, speed, angle)
+    rocket.rect.x = 0
+    rocket.rect.y = screen_height - 20
+
+    all_sprites_list.add(rocket)
+    rockets.add(rocket)
+    
+    
 pygame.init()
 
 screen = pygame.display.set_mode([screen_width, screen_height])
 
 rockets = pygame.sprite.Group()
 all_sprites_list = pygame.sprite.Group()
+trail_list = pygame.sprite.Group()
 
 for k in range(populationSize):
     makeRandomRocket()
@@ -167,41 +223,70 @@ target = Block(red, 20, 20, 0, 0)
 target.rect.x = xTarget
 target.rect.y = screen_height-20
 
-all_sprites_list.add(target)
+trail_list.add(target)
 
 done = False
 
 clock = pygame.time.Clock()
 
 while not done:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
+    if solved == False:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
 
-    screen.fill(white)
+        screen.fill(white)
 
-    all_sprites_list.draw(screen)
+        all_sprites_list.draw(screen)
+        trail_list.draw(screen)
 
-    clock.tick(fps)
+        clock.tick(fps)
 
-    pygame.display.flip()
+        pygame.display.flip()
 
-    rockets.update()
+        rockets.update()
 
-    if alive == 0:
-        generations += 1
-        average = findBest()
-        print(generations, "Average: ", average, best)
+        if alive == 0:
+            generations += 1
+            average = findBest()
+            print(generations, "Average: ", average, best)
 
-        if best[1][0] == 0:
-            print("Found Solution: Speed = ",best[1][1][0],"; Angle = ",best[1][1][1]," Degrees.")
-            print("This took ",generations," Generations")
-            done = True
-        else:
-            population = []
-            for k in range (populationSize):
-                newPopulation()
-                alive += 1
+            if best[1][0] == 0:
+                print("Found Solution: Speed = ",best[1][1][0],"; Angle = ",best[1][1][1]," Degrees.")
+                print("This took ",generations," Generations")
+                solved = True
+
+                print("Making trail leader")
+                speed = best[1][1][0]
+                angle = best[1][1][1]
+                trailLeader = Block(green, 20, 20, speed, angle)
+                trailLeader.rect.x = 0
+                trailLeader.rect.y = screen_height-20
+                trail_list.add(trailLeader)
+                print("Made trail leader")
+            else:
+                all_sprites_list.empty()
+                population = []
+                for k in range (populationSize):
+                    newPopulationBetter()
+                    alive += 1
+    else:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
+
+        clock.tick(fps)
+        pygame.display.flip()
+
+        screen.fill(white)
+        trailLeader.update()
+
+        trailLeader.storePosition()
+
+        point = Trail(blue, yPosition, xPosition)
+        trail_list.add(point)
+
+        trail_list.draw(screen)
 
 pygame.quit()
 
